@@ -35,6 +35,7 @@ RUN apt-get update && \
   software-properties-common \
   sudo \
   telnet \
+  tmux \
   traceroute \
   unzip \
   vim \
