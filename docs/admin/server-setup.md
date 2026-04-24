@@ -10,8 +10,9 @@ The full stack requires:
 3. Sysbox — for safe nested Docker inside workspaces
 4. PostgreSQL — for Coder's database (required for multi-server HA)
 5. TLS certificate — via Let's Encrypt DNS challenge
-6. Coder server — the control plane
-7. This template — deployed to Coder
+6. Terraform — required before installing Coder (workaround for a Coder install bug)
+7. Coder server — the control plane
+8. This template — deployed to Coder
 
 ---
 
@@ -300,7 +301,36 @@ If you're migrating an existing DNS name (e.g., `coder.ddev.com`) from another s
 
 ---
 
-## Step 6: Install Coder
+## Step 6: Install Terraform
+
+Coder attempts to install Terraform automatically on first boot, but this fails due to a bug ([coder/coder#24578](https://github.com/coder/coder/issues/24578)). Install Terraform manually beforehand to work around it.
+
+```bash
+# Install prerequisites
+sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
+
+# Add HashiCorp's GPG key
+wget -O- https://apt.releases.hashicorp.com/gpg | \
+  gpg --dearmor | \
+  sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+
+# Add the official HashiCorp apt repository
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+  https://apt.releases.hashicorp.com \
+  $(grep -oP '(?<=UBUNTU_CODENAME=).*' /etc/os-release || lsb_release -cs) main" | \
+  sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+# Install Terraform
+sudo apt-get update
+sudo apt-get install -y terraform
+
+# Verify
+terraform --version
+```
+
+---
+
+## Step 7: Install Coder
 
 ### Install the binary
 
@@ -439,7 +469,7 @@ There is also a toggle in the Coder admin UI at **Admin → Security** that can 
 
 ---
 
-## Step 7: Deploy the DDEV Template
+## Step 8: Deploy the DDEV Template
 
 With Coder running and the CLI authenticated, follow the [Operations Guide](./operations-guide.md) to build the Docker image and push the template.
 
@@ -456,7 +486,7 @@ make deploy-user-defined-web
 
 ---
 
-## Step 8: Set Up the Drupal Core Seed Cache (optional, highly recommended)
+## Step 9: Set Up the Drupal Core Seed Cache (optional, highly recommended)
 
 The `drupal-core` template can provision a fully configured Drupal core development environment on new workspaces using a **seed cache** on the host. Without the cache, first-time workspace setup downloads a full git clone and all composer dependencies (~10-13 minutes). With the cache, the install phase drops to ~15 seconds, and total workspace startup is about a minute.
 
@@ -605,7 +635,7 @@ ddev logs       # check container logs for errors
 
 ---
 
-## Step 9: Set Up Discord Notifications
+## Step 10: Set Up Discord Notifications
 
 Coder can send webhook notifications to Discord for events like new user signups, workspace creation/deletion, and workspace health alerts. This uses a small relay service that translates Coder's webhook format to Discord's.
 
