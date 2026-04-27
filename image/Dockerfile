@@ -159,6 +159,10 @@ RUN curl -fsSL https://pkg.ddev.com/apt/gpg.key | gpg --dearmor -o /etc/apt/keyr
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ddev && \
   rm -rf /var/lib/apt/lists/*
 
+# Wrapper so system tools (e.g. phpcs) can invoke PHP via DDEV
+RUN printf '#!/usr/bin/env bash\nddev php "$@"\n' > /usr/local/bin/php && \
+  chmod +x /usr/local/bin/php
+
 RUN mkdir -p /home/linuxbrew/.linuxbrew && chown -R coder:coder /home/linuxbrew/
 
 USER coder
