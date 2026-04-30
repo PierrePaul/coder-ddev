@@ -126,6 +126,22 @@ test-templates: ## Run Terraform mock unit tests for all templates (requires ter
 push-staging: ## Push all templates to staging-coder.ddev.com inactive (ACTIVATE=false); requires CODER_URL set to staging
 	$(MAKE) push-all-templates ACTIVATE=false
 
+.PHONY: archive-inactive-versions
+archive-inactive-versions: ## Archive all inactive template versions (requires coder CLI pointed at target instance)
+	@for t in $(TEMPLATES); do \
+		echo "--- Archiving inactive versions for $$t ---"; \
+		versions=$$(coder templates versions list $$t --output json 2>/dev/null | jq -r '.[] | select(.active == false) | .TemplateVersion.name'); \
+		if [ -z "$$versions" ]; then \
+			echo "  No inactive versions."; \
+		else \
+			for v in $$versions; do \
+				coder templates versions archive $$t --yes $$v 2>/dev/null \
+					&& echo "  Archived $$v" \
+					|| echo "  Skipped $$v (in use by a workspace)"; \
+			done; \
+		fi; \
+	done
+
 .PHONY: clean
 clean: ## Remove local image
 	@echo "Removing local images..."
