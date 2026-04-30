@@ -524,27 +524,30 @@ sudo vim /etc/coder.d/coder.env
 
 #### Listening on port 443 (recommended for production)
 
-Coder terminates TLS itself — no reverse proxy needed:
+Coder terminates TLS itself — no reverse proxy needed. Replace `coder.example.com` with your actual hostname throughout:
 
 ```bash
-# Externally-reachable URL
-CODER_ACCESS_URL=https://coder.ddev.com
+# Externally-reachable URL — replace with your hostname
+CODER_ACCESS_URL=https://coder.example.com
 
 # Serve HTTPS directly on port 443
 CODER_TLS_ENABLE=true
 CODER_TLS_ADDRESS=0.0.0.0:443
-CODER_TLS_CERT_FILE=/etc/letsencrypt/live/coder.ddev.com/fullchain.pem
-CODER_TLS_KEY_FILE=/etc/letsencrypt/live/coder.ddev.com/privkey.pem
+CODER_TLS_CERT_FILE=/etc/letsencrypt/live/coder.example.com/fullchain.pem
+CODER_TLS_KEY_FILE=/etc/letsencrypt/live/coder.example.com/privkey.pem
 
 # Redirect HTTP on port 80 to HTTPS
 CODER_HTTP_ADDRESS=0.0.0.0:80
 CODER_REDIRECT_TO_ACCESS_URL=true
 
-# Wildcard domain for workspace app subdomain routing (requires *.coder.ddev.com DNS + cert)
-CODER_WILDCARD_ACCESS_URL=*.coder.ddev.com
+# Wildcard domain for workspace app subdomain routing (requires *.coder.example.com DNS + cert)
+CODER_WILDCARD_ACCESS_URL=*.coder.example.com
 
-# PostgreSQL connection (set up in Step 5)
+# PostgreSQL connection (set up in Step 5) — replace the password
 CODER_PG_CONNECTION_URL=postgresql://coder:strongpasswordhere@localhost/coder?sslmode=disable
+
+# Telemetry — disable if you prefer not to send usage data to Coder
+CODER_TELEMETRY=false
 ```
 
 #### Alternative: plain HTTP or non-standard port
@@ -552,7 +555,7 @@ CODER_PG_CONNECTION_URL=postgresql://coder:strongpasswordhere@localhost/coder?ss
 If you're running behind a reverse proxy (nginx, Caddy) that handles TLS, or just testing on a LAN:
 
 ```bash
-CODER_ACCESS_URL=http://coder.ddev.com:3000
+CODER_ACCESS_URL=http://coder.example.com:3000
 CODER_HTTP_ADDRESS=0.0.0.0:3000
 # No TLS variables needed; your proxy handles termination
 ```
@@ -572,7 +575,7 @@ journalctl -u coder -f
 
 ### First-run admin setup
 
-Navigate to `https://coder.ddev.com` and create the initial admin user.
+Navigate to `https://coder.example.com` (your hostname) and create the initial admin user.
 
 > **Important:** Use your GitHub username as the Coder username (e.g. `rfay`). When you later log in via GitHub OAuth, Coder matches on username — if the name is already taken it creates a second account with a random suffix (e.g. `rfay-wanderingortiz8`) which will not have admin permissions. Getting the username right here avoids that entirely.
 
@@ -698,7 +701,7 @@ DDEV must be installed on the Coder server itself (not just inside workspaces). 
 
 Follow the [DDEV Linux installation instructions](https://docs.ddev.com/en/stable/users/install/ddev-installation/#ddev-installation-linux) to install DDEV on the host.
 
-> **User note:** The seed cache must be owned and operated by a normal (non-root) user. DDEV refuses to run as root. All the commands below, and the systemd service, must run as that user — not with `sudo`. On this server the user is `rfay`; adjust for your own setup.
+> **User note:** The seed cache must be owned and operated by a normal (non-root) user. DDEV refuses to run as root. All the commands below, and the systemd service, must run as that user — not with `sudo`.
 
 ### One-time initial setup
 
@@ -755,9 +758,11 @@ sudo install -m 644 $REPO/drupal-core/scripts/drupal-cache-updater.service \
 sudo install -m 644 $REPO/drupal-core/scripts/drupal-cache-updater.timer \
   /etc/systemd/system/
 
-# If your seed directory or cache user differs from the defaults, edit the service:
+# Edit the service to set the correct user (required — YOURUSER is a placeholder):
+sudo sed -i "s/User=YOURUSER/User=$(whoami)/" /etc/systemd/system/drupal-cache-updater.service
+# If your seed directory differs from ~/cache/drupal-core-seed, also add --seed-dir:
 #   sudo vim /etc/systemd/system/drupal-cache-updater.service
-# See the comments in that file for User and --seed-dir guidance.
+# and change ExecStart to: /usr/local/bin/update-drupal-cache --seed-dir /your/cache/path
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now drupal-cache-updater.timer
@@ -783,24 +788,12 @@ journalctl -u drupal-cache-updater.service -f
 
 ### Template variable
 
-The template uses a `cache_path` variable for the host-side seed directory. The default in both `drupal-core/template.tf` and the `Makefile` is currently hardcoded to the path on this server (`/home/rfay/cache/drupal-core-seed`), so `make push-template-drupal-core` works without any override on this server.
+The template uses a `cache_path` variable for the host-side seed directory. The `Makefile` defaults `DRUPAL_CACHE_PATH` to `~/cache/drupal-core-seed` (resolved to the home directory of whoever runs `make`), so `make push-template-drupal-core` works without any override as long as your seed directory is at that path.
 
-**On a different server or with a different user**, update the defaults before deploying:
-
-```bash
-# In Makefile, change:
-DRUPAL_CACHE_PATH ?= /home/youruser/cache/drupal-core-seed
-
-# In drupal-core/template.tf, change:
-variable "cache_path" {
-  default = "/home/youruser/cache/drupal-core-seed"
-}
-```
-
-Or override at deploy time without changing files:
+If your seed directory is elsewhere, override at deploy time:
 
 ```bash
-make push-template-drupal-core DRUPAL_CACHE_PATH=/home/youruser/cache/drupal-core-seed
+make push-template-drupal-core DRUPAL_CACHE_PATH=/your/cache/path
 ```
 
 ### How new workspaces use the cache
